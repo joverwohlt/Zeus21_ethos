@@ -47,39 +47,32 @@ class Power_Spectra_Binned:
                 self.PS21[j,i] = Power_Spectra.Deltasq_T21[iz_list[j],ik_list[i]]
 
 
-class Inference:
-    def __init__(self, data, noise, k_range, z_range, h_peak_range, k_peak_range, 
-                 hmf_dict, CosmoParams, ClassCosmo, Correlations, 
-                 h_peak, k_peak, epsstar = 0.1, alphastar = 0.5, L40_xray = 3.0, E0_xray = 500, z=10, RSD=1, Flag_Only_ETHOS = True):
+def log_posterior(theta, data, noise, k_range, z_range, h_peak_range, k_peak_range, epsstar_range, alphastar_range, L40_xray_range, E0_xray_range, 
+                  hmf_dict, CosmoParams, ClassCosmo, Correlations, z=10, RSD=1): 
+    
+
+
+    h_peak, log_k_peak, log_epsstar, alphastar, log_L40_xray, log_E0_xray = theta
+
+
+    logPrior = log_prior(h_peak, log_k_peak,h_peak_range, k_peak_range, epsstar_range, alphastar_range, L40_xray_range, E0_xray_range, log_epsstar, alphastar , log_L40_xray, log_E0_xray)
         
-        if Flag_Only_ETHOS == True:
-            self.logPrior = log_prior_ETHOS_only(h_peak, k_peak, h_peak_range, k_peak_range)
-        #else:
-            #self.logPrior = log_prior(h_peak, k_peak,h_peak_range, k_peak_range, epsstar_range, alphastar_range, L40_xray_range, E0_xray_range, epsstar = 0.1, alphastar = 0.5, L40_xray = 3.0, E0_xray = 500,Flag_Only_ETHOS = False)
-        self.logLikelihood = log_likelihood(data, noise, k_range,z_range, hmf_dict, CosmoParams, ClassCosmo, Correlations, h_peak, k_peak, epsstar, alphastar, L40_xray, E0_xray, z, RSD, Flag_Only_ETHOS)
-        self.logPosterior = self.logPrior + self.logLikelihood
+    k_peak = 10**log_k_peak
+    epsstar = 10**log_epsstar
+    E0_xray = 10**log_E0_xray
+    L40_xray = 10**log_L40_xray
 
+    if logPrior ==0:
 
-def log_posterior(theta, data, noise, k_range, z_range, h_peak_range, k_peak_range, 
-                 hmf_dict, CosmoParams, ClassCosmo, Correlations, 
-                 epsstar = 0.1, alphastar = 0.5, L40_xray = 3.0, E0_xray = 2.7, z=10, RSD=1, Flag_Only_ETHOS = True):
+        logLikelihood = log_likelihood(data, noise, k_range,z_range, hmf_dict, CosmoParams, ClassCosmo, Correlations, h_peak, k_peak, epsstar, alphastar, L40_xray, E0_xray, z, RSD)
+
+        return logLikelihood
     
+    else:
+        return logPrior      
 
-    if Flag_Only_ETHOS == True:
-
-        h_peak, k_peak = theta
-
-        k_peak = 10**k_peak
-        E0_xray = 100**E0_xray
-        logPrior = log_prior_ETHOS_only(h_peak, k_peak, h_peak_range, k_peak_range)
-        #else:
-            #logPrior = log_prior(h_peak, k_peak,h_peak_range, k_peak_range, epsstar_range, alphastar_range, L40_xray_range, E0_xray_range, epsstar = 0.1, alphastar = 0.5, L40_xray = 3.0, E0_xray = 500,Flag_Only_ETHOS = False)
-    logLikelihood = log_likelihood(data, noise, k_range,z_range, hmf_dict, CosmoParams, ClassCosmo, Correlations, h_peak, k_peak, epsstar, alphastar, L40_xray, E0_xray, z, RSD, Flag_Only_ETHOS)
-    
-    return logPrior + logLikelihood       
-
-def log_prior(h_peak, k_peak,h_peak_range, k_peak_range, epsstar_range, alphastar_range, L40_xray_range, E0_xray_range,
-              epsstar, alphastar, L40_xray, E0_xray):
+def log_prior(h_peak, log_k_peak,h_peak_range, k_peak_range, epsstar_range, alphastar_range, L40_xray_range, E0_xray_range,
+              log_epsstar, alphastar, log_L40_xray, log_E0_xray):
         
 
     h_peak_min = np.min(h_peak_range)
@@ -97,71 +90,58 @@ def log_prior(h_peak, k_peak,h_peak_range, k_peak_range, epsstar_range, alphasta
 
 
     if h_peak_min <= h_peak <= h_peak_max:
-        p_h = 1
-    else:
         p_h = 0
-    if k_peak_min < k_peak < k_peak_max:
-        p_k = 1#k_peak**-1
     else:
-        p_k     = 0
-    if epsstar_min < epsstar < epsstar_max:
-            p_epsstar = 1#epsstar**-1 
+        p_h = -np.inf
+    if k_peak_min <= log_k_peak <= k_peak_max:
+        p_k = 0
     else:
-        p_epsstar = 0
-    if alphastar_min < alphastar < alphastar_max:
-        p_alphastar = 1
+        p_k     = -np.inf
+    if epsstar_min <= log_epsstar <= epsstar_max:
+            p_epsstar = 0
     else:
+        p_epsstar = -np.inf
+    if alphastar_min <= alphastar <= alphastar_max:
         p_alphastar = 0
-    if L40_xray_min < L40_xray < L40_xray_max:
-        p_L40_xray = 1#L40_xray**-1 
     else:
+        p_alphastar = -np.inf
+    if L40_xray_min <= log_L40_xray <= L40_xray_max:
         p_L40_xray = 0
-    if E0_xray_min < E0_xray < E0_xray_max:
-        p_E0_xray = 1#E0_xray**-1
     else:
+        p_L40_xray = -np.inf
+    if E0_xray_min <= log_E0_xray <= E0_xray_max:
         p_E0_xray = 0
-
-    return np.log(p_h*p_k*p_epsstar*p_alphastar*p_L40_xray*p_E0_xray)
-
-
-def log_likelihood(data, noise, k_range,z_range, hmf_dict, CosmoParams, ClassCosmo, Correlations, h_peak, k_peak, epsstar = 0.1, alphastar = 0.5, L40_xray = 3.0, E0_xray = 500, z=10, RSD=1, Flag_Only_ETHOS = True):
-
-  
-
-    if Flag_Only_ETHOS == True:
-        k_peak = 10**k_peak 
-        #theta = h_peak, k_peak
-        #hmf = hmfdict[h_peak, k_peak]
-        hmf = read_hmf(h_peak, k_peak, hmf_dict)
-        AstroParams = inputs.Astro_Parameters(Cosmo_Parameters=CosmoParams)
-
     else:
+        p_E0_xray = -np.inf
 
-        k_peak = 10**k_peak
-        epsstar = 10**epsstar
-        L40_xray = 10**L40_xray
-        E0_xray = 10**E0_xray
+    return (p_h+p_k+p_alphastar+p_epsstar+p_alphastar+p_L40_xray+p_E0_xray)
 
-        #theta = h_peak, k_peak, epsstar, alphastar, L40_xray, E0_xray
-        #hmf = hmfdict[h_peak, k_peak]
-        hmf = read_hmf(h_peak, k_peak, hmf_dict)
-        AstroParams = inputs.Astro_Parameters(Cosmo_Parameters=CosmoParams, epsstar=epsstar, alphastar=alphastar, L40_xray=L40_xray, E0_xray=E0_xray)    
+
+def log_likelihood(data, noise, k_range,z_range, hmf_dict, CosmoParams, ClassCosmo, Correlations, h_peak, k_peak, epsstar = 0.1, alphastar = 0.5, L40_xray = 3.0, E0_xray = 500, z=10, RSD=1):
+
+
+        
+    hmf = read_hmf(h_peak, k_peak, hmf_dict)
+    AstroParams = inputs.Astro_Parameters(Cosmo_Parameters=CosmoParams, epsstar=epsstar, alphastar=alphastar, L40_xray=L40_xray, E0_xray=E0_xray)    
     
 
     T21_coeff = sfrd.get_T21_coefficients(CosmoParams, ClassCosmo, AstroParams, hmf, zmin=z) 
     powerspec21_model = correlations.Power_Spectra(CosmoParams, ClassCosmo, Correlations, T21_coeff, RSD_MODE=RSD)
-        
-    #self.klist = powerspec21_model.klist_PS
-    #self.zlist = T21_coeff.zintegral
 
     obsPS = Power_Spectra_Binned(powerspec21_model, T21_coeff, k_range,z_range)
 
     lh = -1/2*(np.log(2*np.pi*noise**2)+((data - obsPS.PS21)/ noise)**2)
     log_lh = np.sum(lh)
 
+    if not np.isfinite(log_lh):
+        log_lh = -np.inf
+
+    if np.isnan(log_lh):
+        log_lh = -np.inf
+
     return log_lh
 
-def log_prior_ETHOS_only(h_peak, k_peak, h_peak_range, k_peak_range):
+def log_prior_ETHOS_only(h_peak, log_k_peak, h_peak_range, k_peak_range):
 
 
 
@@ -176,7 +156,7 @@ def log_prior_ETHOS_only(h_peak, k_peak, h_peak_range, k_peak_range):
         p_h = 1
     else:
         p_h = 0
-    if k_peak_min < k_peak < k_peak_max:
+    if k_peak_min < log_k_peak < k_peak_max:
         p_k = 1 #k_peak**-1
     else:
         p_k = 0
@@ -186,8 +166,6 @@ def log_prior_ETHOS_only(h_peak, k_peak, h_peak_range, k_peak_range):
 
 def read_hmf(h_peak, k_peak, hmf_dict): 
 
-    #read from nearest dictionary keys to input h_peak and k_peak
-    
     h_peak_input = h_peak
     k_peak_input = k_peak
     hmf_dict = hmf_dict

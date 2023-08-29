@@ -16,7 +16,6 @@ from scipy.interpolate import interp1d,InterpolatedUnivariateSpline
 from scipy.integrate import quad, simps
 from . import constants
 from . import correlations
-from hmf import MassFunction, Transfer	 # The main hmf class
 import mcfit
 
 import astropy.units as u
@@ -201,6 +200,18 @@ def T_WDM_Sebastian(k, k_peak, mu=1.12):
     k0_5 = k_peak/3
     alpha = 1/k0_5*(1/np.sqrt(2)**(-mu/5)-1)**(1/(2*mu))
     return (1 + (alpha*k)**(2*mu)) ** (-5/mu)
+
+def T_WDM_First_Peak(k, k_peak, h_peak, mu=1.12):
+
+    sig = T_ETHOS_params['sig']
+
+    x_peak1 = (k - k_peak)/k_peak
+
+    parameterisation = np.abs(T_WDM_Sebastian(k, k_peak, mu) \
+                       - np.sqrt(h_peak) * np.exp(-0.5*(x_peak1/sig)**2) )
+                       
+    return parameterisation
+
 
 def f_exp(h_peak, a, b, c):
     """
@@ -425,9 +436,11 @@ class HMF_interpolator:
         
         return
 
-    def Pk_ETHOS(self,h_peak, k_peak, c=-20):
-        if h_peak == 0.0:
-            return lambda k : T_WDM_Sebastian(k,k_peak)**2. * self.Pk_CLASS_LCDM(k)*self.cosmo.h
+    def Pk_ETHOS(self, h_peak, k_peak, c=-20, mu=1.12):
+        if h_peak < 0.2:
+            #return lambda k : T_WDM_Sebastian(k,k_peak)**2. * self.Pk_CLASS_LCDM(k)*self.cosmo.h
+        #elif 0.0 > h_peak > 0.2:
+            return lambda k: T_WDM_First_Peak(k, k_peak, h_peak, mu)**2. * self.Pk_CLASS_LCDM(k)*self.cosmo.h 
         else:
             return lambda k : T_ETHOS(k, k_peak, h_peak, c)**2. * self.Pk_CLASS_LCDM(k)*self.cosmo.h
 

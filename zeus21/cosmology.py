@@ -16,11 +16,11 @@ from scipy.interpolate import interp1d,InterpolatedUnivariateSpline
 from scipy.integrate import quad, simps
 from . import constants
 from . import correlations
-from hmf import MassFunction, Transfer	 # The main hmf class
 import mcfit
-
+import os
+base_path = os.path.abspath(os.path.dirname(__file__))
 import astropy.units as u
-
+from hmf import MassFunction, Transfer	 # The main hmf class
 
 T_ETHOS_params = {'b':[-2.1,-3.7,4.1],
                   'd':[1.8,-6.7,2.5],
@@ -221,20 +221,11 @@ def f_exp(h_peak, a, b, c):
     return a*np.exp(b*h_peak) + c
 
 
-def f_tanh2(h_peak, a=0.6, b=3.3, c=0.6, d=1):
-    """
-    tanh function
-    """
-    #return a*(np.tanh(b*(h_peak-c))+d)
-    return a*(np.tanh(b*(h_peak-c))+d) - a*(np.tanh(-b*c)+d)
-
 def f_tanh(h_peak, a=0.6, b=3.3, c=0.6, d=1):
     """
     tanh function
     """
     return a*(np.tanh(b*(h_peak-c))+d)
-    #return a*(np.tanh(b*(h_peak-c))+d) - a*(np.tanh(-b*c)+d)
- 
 
 
 def f_gauss(h_peak, peak=0.8, h0=0.53, sig=0.08):
@@ -255,25 +246,44 @@ def h2_model(h_peak, k_peak):
     """
     h2(h_peak, k_peak)
     """
-    A = f_skewgauss(h_peak, *h2_params['A_skew']) #f_gauss(h_peak, *h2_params['A'])
+    A = f_skewgauss(h_peak, *h2_params['A_skew']) - f_skewgauss(0., *h2_params['A_skew'])
     B = f_tanh(h_peak, *h2_params['B'])
-    C = f_tanh(h_peak, *h2_params['C'])
+    C = f_tanh(h_peak, *h2_params['C']) - f_tanh(0., *h2_params['C'])
     return A*np.exp(B*k_peak) + C
 
 
-def W_Bohr(k, R, beta=3.6, c=3.6):
+def T_ETHOS_smooth(k, k_peak, h_peak, c=-20):
     """
-    Fourier space smooth window function from Bohr+2020b
+    Bohr+2020 parameterisation
 
     Args:
-        k: frequency in Mpc^-1
-        R: filter scale in Mpc
-        beta: shape parameter
-        c: cut transition parameter
-
-    Returns:
-        Window function in Fourier space
+        k: array
+        k_peak:
+        h_peak: must be in h_model list
+        c: cutoff = gamma, all cases - large negative gamma, doesn't make a difference
     """
+
+    b   = f_exp(h_peak, *T_ETHOS_params['b'])
+    d   = f_exp(h_peak, *T_ETHOS_params['d'])
+    tau = f_exp(h_peak, *T_ETHOS_params['tau'])
+    sig = T_ETHOS_params['sig']
+
+    h2 = h2_model(h_peak, k_peak)
+
+    alpha = d/k_peak * (1./np.sqrt(2)**(1./c)-1)**(1./b)
+
+    peak2_ratio = 1.805
+    x_peak1 = (k - k_peak)/k_peak
+    x_peak2 = (k - peak2_ratio*k_peak)/k_peak
+
+    parameterisation = np.abs(T(k, alpha, b, c) \
+                       - np.sqrt(h_peak) * np.exp(-0.5*(x_peak1/sig)**2) \
+                       + np.sqrt(h2)/4. * erfc(x_peak2/tau - 2) \
+                              * erfc(- x_peak2/sig - 2) * np.cos(1.1083*np.pi*k/k_peak))
+    
+    return parameterisation
+
+def W_Bohr(k, R, beta=3.6, c=3.6):
     x = k*R/c
     return 1./(1+x**beta)
 
@@ -291,7 +301,7 @@ class HMF_interpolator:
 	    	#     logk=False, smooth_Tk=False, N_k=10000, LCDM=True):
         self._Mhmin = 1e5
         self._Mhmax = 1e14
-        self._NMhs = np.floor(100*constants.precisionboost).astype(int)#35
+        self._NMhs = np.floor(35*constants.precisionboost).astype(int)#35
         self.Mhtab = np.logspace(np.log10(self._Mhmin),np.log10(self._Mhmax),self._NMhs) # Halo mases in Msun
         self.RMhtab = RadofMh(Cosmo_Parameters, self.Mhtab)
 
@@ -320,7 +330,7 @@ class HMF_interpolator:
         self.delta_crit = 1.686
         self.Pk = correlations.Correlations(Cosmo_Parameters, ClassCosmo)._PklinCF
         self.klist_Pk = correlations.Correlations(Cosmo_Parameters, ClassCosmo)._klistCF 
-        self.klist = np.logspace(np.log10(1.1e-5), np.log10(Cosmo_Parameters.kmax_CLASS),len(self.klist_Pk))
+        self.klist = np.logspace(np.log10(1.1e-5), np.log10(500),len(self.klist_Pk))
         self.CLASS_Pk = np.zeros_like(self.klist) # P(k) in 1/Mpc^3
         for ik, kk in enumerate(self.klist):
             self.CLASS_Pk[ik] = ClassCosmo.pk(kk, 0.0)#ClassCosmo.pk(self.klist,0.0)
@@ -422,19 +432,25 @@ class HMF_interpolator:
         self.sigmaRintlog = RegularGridInterpolator(self.fitRztab, self.sigmaofRtab) #no need to log either
 
     def load_Pk_LCDM(self):
-       
-        self.Pk_CLASS_LCDM = scipy.interpolate.interp1d(self.klist,self.CLASS_Pk)#,kind='quadratic')
-     
+        
+        self.Pk_CLASS_LCDM = scipy.interpolate.interp1d(self.klist,self.CLASS_Pk)
+        #Pk_LCDM_file = base_path+"/../newLy-a_cdm_sim_model_matterpower.dat"
+        #kcdm, P  = np.loadtxt(Pk_LCDM_file).T
+        #tf = Transfer()
+        #tf.transfer_model = 'EH' # default CAMB is bad at high k
+        #kcdm, P = tf.k, tf.power
+        
+       # self.Pk_CLASS_LCDM  = scipy.interpolate.interp1d(kcdm, P)
         
         return
 
-    def Pk_ETHOS(self, h_peak, k_peak, c=-20, mu=1.12):
+    def Pk_ETHOS(self, h_peak, k_peak, c=-20):
         #if h_peak < 0.2:
             #return lambda k : T_WDM_Sebastian(k,k_peak)**2. * self.Pk_CLASS_LCDM(k)*self.cosmo.h
         #elif 0.0 > h_peak > 0.2:
         #    return lambda k: T_WDM_First_Peak(k, k_peak, h_peak, mu)**2. * self.Pk_CLASS_LCDM(k)*self.cosmo.h 
         #else:
-        return lambda k : T_ETHOS(k, k_peak, h_peak, c)**2. * self.Pk_CLASS_LCDM(k)*self.cosmo.h
+            return lambda k : T_ETHOS(k, k_peak, h_peak, c)**2. * self.Pk_CLASS_LCDM(k)*self.cosmo.h
 
 
     def sigma2_M(self, M, beta=3.6, c=3.6, vb=False):
@@ -458,19 +474,19 @@ class HMF_interpolator:
 	    def sigma2_integrand(k, R):
 
 	    	Pk = self.Pk_ETHOS(h_peak=h_peak, k_peak=k_peak)(k)
-	    	if vb:
-	    	    print(f'sigma2: ETHOS h_peak={h_peak}, k_peak={k_peak}')
+	    	#if vb:
+	    	#    print(f'sigma2: ETHOS h_peak={h_peak}, k_peak={k_peak}')
 
-	    	if vb:
-	    	    print(f'sigma2: Using {self.window_function} window function')
-	    	if h_peak == 0:
-	    	    W  = W_Smooth(k, R, beta=50., c=2.8) 
+	    	#if vb:
+	    	#    print(f'sigma2: Using {self.window_function} window function')
+	    	if h_peak == 0: #self.window_function == 'Smooth':
+	    	    W  = W_Smooth(k, R, beta=50., c=2.8)
 	    	else:
-	    	    W  = W_Smooth(k, R, beta, c) 
+	    	    W = W_Smooth(k, R, beta, c)#print('Invalid window function')
 
 	    	return k**2. * Pk * W**2.
 
-	    kmin, kmax = np.min(self.klist)*1.1, np.max(self.klist)*0.99#1.1e-5,2000
+	    kmin, kmax = np.min(self.klist)*1.1, np.max(self.klist)*0.999#1.1e-5,2000
 	    if self.logk:
 	    	k = np.logspace(np.log10(kmin), np.log10(kmax), num=self.N_k)
 	    else:
@@ -499,16 +515,16 @@ class HMF_interpolator:
 
 	    	Pk = self.Pk_ETHOS(h_peak=h_peak, k_peak=k_peak)(k)
 
-	    	if h_peak == 0:
+	    	if h_peak == 0.0: #self.window_function == 'Smooth':
 	    	    W  = W_Smooth(k, R, beta=50., c=2.8)
-	    	    dW_dR = dW_dR_Smooth(k, R, beta=50, c=2.8)
+	    	    dW_dR = dW_dR_Smooth(k, R, beta=50., c=2.8)
 	    	else:
 	    	    W  = W_Smooth(k, R, beta, c)
-	    	    dW_dR = dW_dR_Smooth(k, R, beta, c)
+	    	    dW_dR = dW_dR_Smooth(k, R, beta, c)#print('Invalid window function')
 
 	    	return k**2. * Pk * W * dW_dR
 
-	    kmin, kmax = np.min(self.klist)*1.1, np.max(self.klist)*0.99
+	    kmin, kmax = np.min(self.klist)*1.1, np.max(self.klist)*0.999
 	    if self.logk:
 	    	k = np.logspace(np.log10(kmin), np.log10(kmax), num=self.N_k)
 	    else:

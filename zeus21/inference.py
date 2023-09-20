@@ -24,27 +24,92 @@ class Power_Spectra_Binned:
 
         for i in range(len(self.z_center_value)):
             self.z_center_value[i] = (self.z_bins[i]-self.z_bins[i+1])/2+self.z_bins[i+1]
-
         for i in range(len(self.k_center_value)):
             self.k_center_value[i] = (self.k_bins[i]-self.k_bins[i+1])/2+self.k_bins[i+1]
 
         
-        iz_list = []
-        ik_list = []
+        iz_list_center = []
+        ik_list_center = []
 
         for j in range(len(self.z_center_value)):
-            iz_list.append(min(range(len(zlist)), key=lambda i: np.abs(zlist[i]-self.z_center_value[j])))
+            iz_list_center.append(min(range(len(zlist)), key=lambda i: np.abs(zlist[i]-self.z_center_value[j])))
+            #print(min(range(len(zlist)), key=lambda i: np.abs(zlist[i]-self.z_center_value[j])))
         for j in range(len(self.k_center_value)):
-            ik_list.append(min(range(len(klist)), key=lambda i: np.abs(klist[i]-self.k_center_value[j])))
+            ik_list_center.append(min(range(len(klist)), key=lambda i: np.abs(klist[i]-self.k_center_value[j])))
+
+        self.iz_list = np.zeros((len(self.z_center_value), 3), dtype=int)
+        self.iz_list[:,1] =iz_list_center 
+        self.ik_list = np.zeros((len(self.k_center_value), 3), dtype=int)
+        self.ik_list[:,1] =ik_list_center 
+        
+        for j in range(len(self.z_center_value)):
+            z1= (self.z_bins[j]-self.z_center_value[j])/2+self.z_center_value[j]
+            z2= (-self.z_bins[j+1]+self.z_center_value[j])/2+self.z_bins[j+1]
+            self.iz_list[j,0]=(min(range(len(zlist)), key=lambda j: np.abs(zlist[j]-z1)))
+            self.iz_list[j,2]=(min(range(len(zlist)), key=lambda j: np.abs(zlist[j]-z2)))
+
+        for j in range(len(self.k_center_value)):
+            k1= (self.k_bins[j]-self.k_center_value[j])/2+self.k_center_value[j]
+            k2= (-self.k_bins[j+1]+self.k_center_value[j])/2+self.k_bins[j+1]
+            self.ik_list[j,0]=(min(range(len(klist)), key=lambda j: np.abs(klist[j]-k1)))
+            self.ik_list[j,2]=(min(range(len(klist)), key=lambda j: np.abs(klist[j]-k2)))            
 
 
-        self.PS21 = np.ndarray((len(iz_list), len(ik_list)))
 
-        for i in range(len(ik_list)):
-            for j in range(len(iz_list)):
+        self.PS21_center = np.ndarray((len(iz_list_center), len(ik_list_center)))
+        self.PS21_bins = np.ndarray((len(iz_list_center), len(ik_list_center), 3))
+        self.PS21_avg = np.ndarray((len(iz_list_center), len(ik_list_center)))
+
+        for i in range(len(ik_list_center)):
+            for j in range(len(iz_list_center)):
+                self.PS21_center[j,i] = Power_Spectra.Deltasq_T21[iz_list_center[j],ik_list_center[i]]
+
+        for i in range(len(ik_list_center)):
+            for j in range(len(iz_list_center)):
+                self.PS21_bins[j,i,[0]] = Power_Spectra.Deltasq_T21[self.iz_list[j,0],self.ik_list[i,0]]
+                self.PS21_bins[j,i,[1]] = self.PS21_center[j,i]
+                self.PS21_bins[j,i,[2]] = Power_Spectra.Deltasq_T21[self.iz_list[j,2],self.ik_list[i,2]]
+
+        
+        for i in range(len(ik_list_center)):
+            for j in range(len(iz_list_center)):
+                self.PS21_avg[j,i] = np.mean(self.PS21_bins[j,i])
+
+class Power_Spectra_Binned_21sense:
+    def __init__(self, Power_Spectra, T21_coefficients, k_range,z_range):
+    
+        self.z_center_value = np.ndarray(len(z_range)-1)
+        #self.k_center_value = np.ndarray(len(k_range)-1)
 
 
-                self.PS21[j,i] = Power_Spectra.Deltasq_T21[iz_list[j],ik_list[i]]
+        klist = Power_Spectra.klist_PS
+        zlist = T21_coefficients.zintegral
+        self.z_bins = z_range
+        self.k_center_value =  k_range
+
+
+        for i in range(len(self.z_center_value)):
+            self.z_center_value[i] = (self.z_bins[i]-self.z_bins[i+1])/2+self.z_bins[i+1]
+        #for i in range(len(self.k_center_value)):
+        #    self.k_center_value[i] = (self.k_bins[i]-self.k_bins[i+1])/2+self.k_bins[i+1]
+
+        
+        iz_list_center = []
+        ik_list_center = []
+
+        for j in range(len(self.z_center_value)):
+            iz_list_center.append(min(range(len(zlist)), key=lambda i: np.abs(zlist[i]-self.z_center_value[j])))
+            #print(min(range(len(zlist)), key=lambda i: np.abs(zlist[i]-self.z_center_value[j])))
+        for j in range(len(self.k_center_value)):
+            ik_list_center.append(min(range(len(klist)), key=lambda i: np.abs(klist[i]-self.k_center_value[j])))
+      
+
+        self.PS21_center = np.ndarray((len(iz_list_center), len(ik_list_center)))
+   
+
+        for i in range(len(ik_list_center)):
+            for j in range(len(iz_list_center)):
+                self.PS21_center[j,i] = Power_Spectra.Deltasq_T21[iz_list_center[j],ik_list_center[i]]
 
 
 def log_posterior(theta, data, noise, k_range, z_range, h_peak_range, k_peak_range, epsstar_range, alphastar_range, L40_xray_range, E0_xray_range, 
@@ -98,7 +163,7 @@ def log_prior(h_peak, log_k_peak,h_peak_range, k_peak_range, epsstar_range, alph
     else:
         p_k     = -np.inf
     if epsstar_min <= log_epsstar <= epsstar_max:
-            p_epsstar = 0
+        p_epsstar = 0
     else:
         p_epsstar = -np.inf
     if alphastar_min <= alphastar <= alphastar_max:

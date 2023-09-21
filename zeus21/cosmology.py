@@ -19,8 +19,8 @@ from . import correlations
 import mcfit
 import os
 base_path = os.path.abspath(os.path.dirname(__file__))
-import astropy.units as u
-from hmf import MassFunction, Transfer	 # The main hmf class
+
+
 
 T_ETHOS_params = {'b':[-2.1,-3.7,4.1],
                   'd':[1.8,-6.7,2.5],
@@ -124,33 +124,6 @@ def PS_HMF_unnorm(Cosmo_Parameters, Mass, nu, dlogSdM):
 
 
 
-def W_Smooth(k, R, beta=3.6, c=3.6):
-    """
-    Fourier space smooth window function from Bohr+2020b
-
-    Args:
-        k: frequency in Mpc^-1
-        R: filter scale in Mpc
-        beta: shape parameter
-        c: cut transition parameter
-
-    Returns:
-        Window function in Fourier space
-    """
-    x = k*R/c
-    return 1./(1+x**beta)
-
-def dW_dR_Smooth(k, R, beta=3.6, c=3.6):
-    return -beta/R * W_Bohr(k, R, beta, c)**2. * (k*R/c)**beta
-
-
-
-
-
-
-    
-
-    
 
 
 def T(k, alpha, b, c):
@@ -197,22 +170,6 @@ def T_ETHOS(k, k_peak, h_peak, c=-20):
 
     return parameterisation
 
-def T_WDM_Sebastian(k, k_peak, mu=1.12):
-    k0_5 = k_peak/3
-    alpha = 1/k0_5*(1/np.sqrt(2)**(-mu/5)-1)**(1/(2*mu))
-    return (1 + (alpha*k)**(2*mu)) ** (-5/mu)
-
-def T_WDM_First_Peak(k, k_peak, h_peak, mu=1.12):
-
-    sig = T_ETHOS_params['sig']
-
-    x_peak1 = (k - k_peak)/k_peak
-
-    parameterisation = np.abs(T_WDM_Sebastian(k, k_peak, mu) \
-                       - np.sqrt(h_peak) * np.exp(-0.5*(x_peak1/sig)**2) )
-                       
-    return parameterisation
-
 
 def f_exp(h_peak, a, b, c):
     """
@@ -227,12 +184,6 @@ def f_tanh(h_peak, a=0.6, b=3.3, c=0.6, d=1):
     """
     return a*(np.tanh(b*(h_peak-c))+d)
 
-
-def f_gauss(h_peak, peak=0.8, h0=0.53, sig=0.08):
-    """
-    gaussian function
-    """
-    return peak * np.exp(-0.5*((h_peak-h0)/sig)**2.)
 
 def f_skewgauss(h_peak, peak=0.16, h0=0.53, sig=0.08, alpha=0):
     """

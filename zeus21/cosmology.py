@@ -234,12 +234,12 @@ def T_ETHOS_smooth(k, k_peak, h_peak, c=-20):
     
     return parameterisation
 
-def W_Bohr(k, R, beta=3.6, c=3.6):
+def W_Smoothk, R, beta=3.6, c=3.6):
     x = k*R/c
     return 1./(1+x**beta)
 
-def dW_dR_Bohr(k, R, beta=3.6, c=3.6):
-    return -beta/R * W_Bohr(k, R, beta, c)**2. * (k*R/c)**beta
+def dW_dR_Smooth(k, R, beta=3.6, c=3.6):
+    return -beta/R * W_Smooth(k, R, beta, c)**2. * (k*R/c)**beta
 
     
 

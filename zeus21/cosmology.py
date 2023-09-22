@@ -234,7 +234,7 @@ def T_ETHOS_smooth(k, k_peak, h_peak, c=-20):
     
     return parameterisation
 
-def W_Smoothk, R, beta=3.6, c=3.6):
+def W_Smooth(k, R, beta=3.6, c=3.6):
     x = k*R/c
     return 1./(1+x**beta)
 
